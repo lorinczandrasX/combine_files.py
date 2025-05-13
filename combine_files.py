@@ -2,6 +2,7 @@ import os
 
 TARGET_EXTENSIONS = ['.php', '.js', '.css']
 OUTPUT_FILE = 'combined_plugin_output.txt'
+EXCLUDE_DIRS = ['languages']  # itt soroljuk fel a kihagyandó mappákat
 
 COMMENT_PREFIX = {
     '.php': '//',
@@ -10,19 +11,20 @@ COMMENT_PREFIX = {
     '.txt': '#',
 }
 
+
+
 def get_comment_prefix(extension):
     return COMMENT_PREFIX.get(extension, '#')
 
 def collect_files(root_dir):
     all_files = []
     for dirpath, dirnames, filenames in os.walk(root_dir):
-        if '.git' in dirnames:
-            dirnames.remove('.git')
-        for filename in filenames:
-            _, ext = os.path.splitext(filename)
-            if ext in TARGET_EXTENSIONS:
-                full_path = os.path.join(dirpath, filename)
-                all_files.append(full_path)
+        if os.path.basename(dirpath) not in EXCLUDE_DIRS:  # kihagyjuk a kizárt mappákat
+            for filename in filenames:
+                _, ext = os.path.splitext(filename)
+                if ext in TARGET_EXTENSIONS:
+                    full_path = os.path.join(dirpath, filename)
+                    all_files.append(full_path)
     return all_files
 
 def generate_structure_listing(files):

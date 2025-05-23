@@ -1,11 +1,20 @@
 import os
+import sys
+
+# Rövid magyarázat / hivatkozás
+# Futtatás fájlba:
+# python combine_files.py -f
+# → combined_plugin_output.txt fájlba ír.
+#
+# Futtatás vágólapra:
+# python combine_files.py
+# → vágólapra másol.
 
 # --- Beállítások ---
 TARGET_EXTENSIONS = ['.php', '.js', '.css']
 EXCLUDE_DIRS = ['.git', 'languages', 'node_modules']
 OUTPUT_FILE = 'combined_plugin_output.txt'
 
-# Komment stílus minden támogatott fájltípushoz (egységes: //)
 COMMENT_PREFIX = {
     '.php': '//',
     '.js': '//',
@@ -13,17 +22,14 @@ COMMENT_PREFIX = {
     '.txt': '//',
 }
 
-
 # --- Segédfüggvények ---
 
 def get_comment_prefix(extension):
-    return COMMENT_PREFIX.get(extension, '//')  # alapértelmezés: //
+    return COMMENT_PREFIX.get(extension, '//')
 
 def collect_files(root_dir):
-    """Bejárja az aktuális könyvtárat, kizárva a megadott mappákat, és összegyűjti a fájlokat."""
     all_files = []
     for dirpath, dirnames, filenames in os.walk(root_dir):
-        # Kizárt mappák eltávolítása
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
         for filename in filenames:
             _, ext = os.path.splitext(filename)
@@ -33,41 +39,73 @@ def collect_files(root_dir):
     return all_files
 
 def generate_structure_listing(files):
-    """Relatív elérési útvonalakból készít egy listát a fájlstruktúra blokknak."""
     return [os.path.relpath(f).replace("\\", "/") for f in files]
 
-def combine_files(files, output_file):
-    """Kiírja a struktúrát és a fájlok tartalmát egy fájlba."""
-    with open(output_file, 'w', encoding='utf-8') as outfile:
+def combine_files_content(files):
+    content_lines = []
+    content_lines.append("// Futtatás fájlba:")
+    content_lines.append("// python combine_files.py -f")
+    content_lines.append("// → combined_plugin_output.txt fájlba ír.")
+    content_lines.append("// Futtatás vágólapra:")
+    content_lines.append("// python combine_files.py")
+    content_lines.append("// → vágólapra másol.")
+    content_lines.append("// ====== FÁJLSTRUKTÚRA ======")
+    for path in generate_structure_listing(files):
+        content_lines.append(f"// {path}")
+    content_lines.append("// ====== ÖSSZEFŰZÖTT FÁJLOK KEZDETE ======\n")
+    for filepath in files:
+        rel_path = os.path.relpath(filepath).replace("\\", "/")
+        _, ext = os.path.splitext(filepath)
+        prefix = get_comment_prefix(ext)
+        content_lines.append(f"\n{prefix} ===== FILE: {rel_path} =====\n")
+        try:
+            with open(filepath, 'r', encoding='utf-8') as infile:
+                contents = infile.read()
+                content_lines.append(contents)
+                content_lines.append("\n")
+        except Exception as e:
+            content_lines.append(f"{prefix} ERROR reading {rel_path}: {e}\n")
+    return "\n".join(content_lines)
 
-        # --- Fájllista blokk a fájl elején ---
-        outfile.write("// ====== FÁJLSTRUKTÚRA ======\n")
-        for path in generate_structure_listing(files):
-            outfile.write(f"// {path}\n")
-        outfile.write("// ====== ÖSSZEFŰZÖTT FÁJLOK KEZDETE ======\n\n")
-
-        # --- Tartalom blokk, fájlonként ---
-        for filepath in files:
-            rel_path = os.path.relpath(filepath).replace("\\", "/")
-            _, ext = os.path.splitext(filepath)
-            prefix = get_comment_prefix(ext)
-
-            outfile.write(f"\n{prefix} ===== FILE: {rel_path} =====\n\n")
-
+def copy_to_clipboard(text):
+    try:
+        # Próbáljuk használni a pyperclip-et
+        import pyperclip
+        pyperclip.copy(text)
+        print("[✔] Összefűzött tartalom vágólapra másolva.")
+    except ImportError:
+        # Ha nincs pyperclip, próbálunk natív megoldást
+        if sys.platform == "win32":
+            import subprocess
+            p = subprocess.Popen(['clip'], stdin=subprocess.PIPE, close_fds=True)
+        p.communicate(input=text.encode('utf-8'))
+            print("[✔] Vágólapra másolva (Windows).")
+        elif sys.platform == "darwin":
+            import subprocess
+            p = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE, close_fds=True)
+        p.communicate(input=text.encode('utf-8'))
+            print("[✔] Vágólapra másolva (Mac).")
+        elif sys.platform == "linux":
+            import subprocess
             try:
-                with open(filepath, 'r', encoding='utf-8') as infile:
-                    contents = infile.read()
-                    outfile.write(contents)
-                    outfile.write("\n\n")
-            except Exception as e:
-                outfile.write(f"{prefix} ERROR reading {rel_path}: {e}\n\n")
-
-    print(f"[✔] Összefűzés kész: {output_file}")
-
+                p = subprocess.Popen(['xclip', '-selection', 'clipboard'], stdin=subprocess.PIPE, close_fds=True)
+        p.communicate(input=text.encode('utf-8'))
+                print("[✔] Vágólapra másolva (Linux/xclip).")
+            except FileNotFoundError:
+                print("[!] xclip nincs telepítve. Telepítsd: sudo apt install xclip")
+        else:
+            print("[!] Vágólapra másolás nem támogatott ezen a rendszeren pyperclip nélkül.")
 
 # --- Futtatás ---
 
 if __name__ == '__main__':
     current_directory = os.getcwd()
     files = collect_files(current_directory)
-    combine_files(files, OUTPUT_FILE)
+    content = combine_files_content(files)
+
+    if len(sys.argv) > 1 and sys.argv[1] == '-f':
+        with open(OUTPUT_FILE, 'w', encoding='utf-8') as outfile:
+            outfile.write(content)
+        print(f"[✔] Összefűzés kész: {OUTPUT_FILE}")
+    else:
+        copy_to_clipboard(content)

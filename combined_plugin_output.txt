@@ -1,0 +1,8 @@
+// Futtatás fájlba:
+// python combine_files.py -f
+// → combined_plugin_output.txt fájlba ír.
+// Futtatás vágólapra:
+// python combine_files.py
+// → vágólapra másol.
+// ====== FÁJLSTRUKTÚRA ======
+// ====== ÖSSZEFŰZÖTT FÁJLOK KEZDETE ======
